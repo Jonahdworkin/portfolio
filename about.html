@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About — Jonah Dworkin</title>
+  <meta name="description" content="Jonah Dworkin designs iPhone apps, mostly for music." />
+  <meta name="theme-color" content="#161614" />
+  <meta property="og:title" content="About — Jonah Dworkin" />
+  <meta property="og:description" content="Jonah Dworkin designs iPhone apps, mostly for music." />
+  <meta property="og:image" content="https://jonahdworkin.com/assets/img/nd-02-markets.webp" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Instrument+Serif:ital@0;1&family=Shippori+Mincho:wght@500;800&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css?v=37" />
+</head>
+<body data-page="about">
+  <div class="curtain" aria-hidden="true"></div>
+  <header class="bar">
+    <a href="index.html" class="bar__brand mono">Jonah Dworkin</a>
+    <nav class="bar__links mono" aria-label="Primary">
+      <a href="index.html#work" data-scramble>Work</a>
+      <a href="about.html" data-scramble>About</a>
+    </nav>
+    <a href="about.html#contact" class="bar__contact mono" data-scramble>Contact</a>
+  </header>
+
+  <main id="top">
+    <!-- mono no aware: a blossom tree written in characters; petals fall, turn red while they fall, and fade -->
+    <section class="about-hero" aria-label="Mono no aware">
+      <canvas class="blossom" aria-hidden="true"></canvas>
+      <h1 class="sr-only">About Jonah Dworkin — mono no aware, the beauty of things that pass</h1>
+      <p class="about-hero__jp jp" aria-hidden="true">物の哀れ</p>
+      <p class="about-hero__gloss mono" aria-hidden="true"><span>Mono no aware</span><span>The beauty of things that pass</span></p>
+    </section>
+
+    <section class="about" id="about">
+      <p class="label mono"><span class="jp">私</span>About</p>
+      <p class="about__text" data-words>I'm Jonah Dworkin. I design iPhone apps, mostly for music.</p>
+    </section>
+
+    <footer class="contact" id="contact">
+      <p class="label mono"><span class="jp">連絡</span>Contact</p>
+      <a class="contact__mail mono" href="mailto:jonahdworkin1@gmail.com" data-reveal>jonahdworkin1@gmail.com</a>
+      <div class="contact__foot mono">
+        <span>© 2026 Jonah Dworkin</span>
+        <a href="#top" data-scramble>Top ↑</a>
+      </div>
+    </footer>
+  </main>
+
+  <div class="controls mono" role="group" aria-label="Colour mode">
+    <button type="button" data-mode="day" aria-pressed="false"><span class="jp">昼</span>Day</button>
+    <button type="button" data-mode="night" aria-pressed="true"><span class="jp">夜</span>Night</button>
+  </div>
+
+
+  <script src="assets/vendor/gsap.min.js"></script>
+  <script src="assets/vendor/ScrollTrigger.min.js"></script>
+  <script src="assets/vendor/lenis.min.js"></script>
+  <script src="js/main.js?v=41"></script>
+</body>
+</html>

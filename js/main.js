@@ -239,6 +239,7 @@
       T.shown = v;
       T.imgs.forEach((img) => (img.style.opacity = v));
       T.followers.forEach((el) => (el.style.opacity = v)); // e.g. recordings playing over their first frames
+      if (T.row) T.row.style.setProperty("--landed", v); // the landing frame (a phone's bezel) appears with its screen, not before
     }
 
     function drawParticles(p) {

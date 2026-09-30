@@ -867,6 +867,41 @@
     });
   }
 
+  /* ---- films (Cue): each decodes out of characters on arrival, then the recording takes
+     over (scrollBits loads and plays it while it's on screen). Click a film to hear it;
+     only one plays its sound at a time. ---- */
+  function setupFilms() {
+    const items = $$(".films__item");
+    if (!items.length) return;
+    const films = items.map((item) => ({ item, frame: $(".thumb", item), v: $("video", item), btn: $(".films__sound", item) }));
+    const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      io.unobserve(en.target);
+      const f = films.find((x) => x.frame === en.target);
+      const done = () => f.frame.classList.add("is-decoded");
+      const r = f.decoder.reveal(0, 1.1);
+      r ? r.then(done) : done();
+    }), { threshold: 0.25 });
+    films.forEach((f) => {
+      f.decoder = makeDecoder($("img", f.frame));
+      io.observe(f.frame);
+      const hear = (on) => {
+        f.v.muted = !on;
+        f.btn.setAttribute("aria-pressed", String(on));
+      };
+      f.item.addEventListener("click", () => {
+        const on = f.v.muted;
+        films.forEach((o) => o !== f && (o.v.muted = true, o.btn.setAttribute("aria-pressed", "false")));
+        hear(on);
+        if (on) {
+          if (!f.v.src) f.v.src = f.v.dataset.src;
+          f.frame.classList.add("is-decoded");
+          f.v.play().catch(() => {});
+        }
+      });
+    });
+  }
+
   // screens take on their colour as they reach the middle of the view (or when touched)
   function colorFocus() {
     const io = new IntersectionObserver(
@@ -1370,6 +1405,7 @@
 
     setupCrates();
     setupRing();
+    setupFilms();
     scrollBits();
     colorFocus();
 

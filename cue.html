@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Instrument+Serif:ital@0;1&family=Shippori+Mincho:wght@500;800&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=38" />
+  <link rel="stylesheet" href="css/style.css?v=39" />
 </head>
 <body data-page="project">
   <div class="curtain" aria-hidden="true"></div>
@@ -52,6 +52,19 @@
       <p class="proj-info__lede">A music journal. One song, once a day.</p>
     </section>
 
+    <!-- two films: Cue away from the screen. They arrive in characters like every other screen,
+         play in grey and take their colour in the middle of the view. Click one to hear it. -->
+    <section class="films" id="films" aria-label="Cue films">
+      <figure class="films__item">
+        <span class="thumb films__frame"><img src="assets/img/cue-film-beach.webp" alt="Cue film — friends on the beach at golden hour" /><video muted loop playsinline preload="none" data-src="assets/video/cue-beach.mp4"></video></span>
+        <button type="button" class="films__sound jp" aria-pressed="false" aria-label="Play the beach film's sound">音</button>
+      </figure>
+      <figure class="films__item">
+        <span class="thumb films__frame"><img src="assets/img/cue-film-hill.webp" alt="Cue film — records laid out on a hilltop over the sea, Blond on the turntable" /><video muted loop playsinline preload="none" data-src="assets/video/cue-hill.mp4"></video></span>
+        <button type="button" class="films__sound jp" aria-pressed="false" aria-label="Play the hilltop film's sound">音</button>
+      </figure>
+    </section>
+
     <a class="proj-next" href="apple-music.html">
       <span class="proj-next__title mono"><span data-scramble>Apple Music</span> →</span>
     </a>
@@ -69,6 +82,6 @@
   <script src="assets/vendor/gsap.min.js"></script>
   <script src="assets/vendor/ScrollTrigger.min.js"></script>
   <script src="assets/vendor/lenis.min.js"></script>
-  <script src="js/main.js?v=42"></script>
+  <script src="js/main.js?v=43"></script>
 </body>
 </html>

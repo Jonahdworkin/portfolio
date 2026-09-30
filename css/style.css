@@ -525,6 +525,19 @@ figcaption { margin-top: 12px; color: var(--muted); }
 .proj-info--short { display: block; padding: 6vh 0 0; border-top: 0; text-align: center; }
 .proj-info--short .proj-info__lede { margin: 0 auto; max-width: 36ch; }
 
+/* Cue — two films side by side. Like the screens, they arrive in characters, play in grey and
+   take their colour in the middle of the view; clicking one plays its sound (音 turns red). */
+.films { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.8vw, 28px); margin: 12vh var(--pad) 0; }
+.films__item { margin: 0; cursor: pointer; }
+.films .thumb { aspect-ratio: 4 / 3; }
+.films .thumb img, .films .thumb video { border-radius: 3px; object-position: center; }
+.films .thumb:not(.is-decoded) video { opacity: 0; } /* the film only starts showing once its characters have resolved */
+.proj .films .thumb:hover video { filter: none; }
+.films__sound { display: block; margin: 12px 0 0 auto; padding: 0; border: 0; background: none; font-size: 13px; line-height: 1; color: var(--muted); cursor: pointer; transition: color .3s; }
+.films__item:hover .films__sound { color: var(--ink); }
+.films__sound[aria-pressed="true"], .films__item:hover .films__sound[aria-pressed="true"] { color: var(--accent); }
+.films + .proj-next { margin-top: 12vh; }
+
 /* ==========================================================================
    About — mono no aware
    ========================================================================== */
@@ -571,6 +584,7 @@ figcaption { margin-top: 12px; color: var(--muted); }
   .proj-chapter__num { grid-row: auto; }
   .proj-chapter__text { grid-column: 1; }
   .proj-films { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .films { grid-template-columns: 1fr; margin-top: 8vh; }
   .rail { grid-template-columns: 1fr; row-gap: 20px; }
 
   .bar { grid-template-columns: auto 1fr auto; gap: 14px; }

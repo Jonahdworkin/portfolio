@@ -39,7 +39,7 @@
     Promise.all([
       document.fonts.load('400 1em "Instrument Serif"'),
       document.fonts.load('400 1em "IBM Plex Mono"'),
-      document.fonts.load('500 1em "Zen Kaku Gothic New"', "・ー二ニ三キヰ音花桜ヽ"),
+      document.fonts.load('500 1em "Zen Kaku Gothic New"', "・ー二ニ三キヰ音花桜ヽ｜"),
     ]).catch(() => {}),
     new Promise((r) => setTimeout(r, 2000)),
   ]);
@@ -174,7 +174,7 @@
      env: { ctx, canvas, W(), H(), dpr(), cell(), colors(), time() }
      ------------------------------------------------------------------------ */
   function createBreakApart(env) {
-    const MAXS = 9000;
+    const MAXS = 14000;
     const snap = { x: new Float32Array(MAXS), y: new Float32Array(MAXS), g: new Uint8Array(MAXS), a: new Float32Array(MAXS), red: new Uint8Array(MAXS), n: 0 };
     const T = { ok: false, row: null, imgs: [], fades: [], followers: [], targets: null, parts: null, mode: "live", dirty: true, shown: -1, faded: -1 };
     const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
@@ -478,9 +478,10 @@
      ------------------------------------------------------------------------ */
   function createWave(canvas, sound) {
     const ctx = canvas.getContext("2d");
-    const S = { t: 0, amp: 0, mu: 0.5, muT: 0.5, energy: 0, energyT: 0, lastMove: 0, pull: 0, pullT: 0, scroll: 0 };
+    const S = { t: 0, amp: 0, mu: 0.5, muT: 0.5, energy: 0, energyT: 0, lastMove: 0, pull: 0, pullT: 0, pullV: 0, spin: 0, phase: 0, scroll: 0 };
     const ripples = [];
-    const CYCLE = 2 / 4.5; // one period of the wave, as a fraction of the screen width
+    const TURNS = 4 * Math.PI; // how far the helix winds across the screen: 2 turns
+    const CYCLE = (2 * Math.PI) / TURNS; // one period of the wave, as a fraction of the screen width
     let W = 0, H = 0, dpr = 1, cell = 14, cols = 0, rows = 0, ink = "#fff", accent = "#f00", bg = "#000";
 
     const css = (n) => getComputedStyle(root).getPropertyValue(n).trim();
@@ -500,29 +501,44 @@
     window.addEventListener("resize", resize);
     ba = createBreakApart({ ctx, canvas, W: () => W, H: () => H, dpr: () => dpr, cell: () => cell, colors: () => ({ ink, accent, bg }), time: () => S.t });
 
-    const Arows = () => Math.min(rows * 0.3, 20);
+    // the helix lies across a wide screen and stands up the middle of a tall one (a phone)
+    const upright = () => H > W * 1.15;
+    const alongN = () => (upright() ? rows : cols), acrossN = () => (upright() ? cols : rows);
+    const alongOf = (e) => (upright() ? e.clientY / H : e.clientX / W); // 0…1 along the helix
+    const acrossOf = (e) => ((upright() ? e.clientX - W / 2 : e.clientY - H / 2) / cell); // cells from its axis
+    // its radius: the helix fills a little over half the screen's height (or most of a phone's width)
+    const Arows = () => (upright() ? Math.min(cols * 0.36, rows * 0.4) : Math.min(rows * 0.37, cols * 0.4));
     const band = () => Arows() + 8;
-    const strand = (v, y, z) => {
-      const depth = (z + 1) / 2;
-      const d = (v - y) / (0.8 + 1.7 * depth); // strand thickness, in rows: thin at the back, full at the front
-      return Math.exp(-d * d) * (0.35 + 0.65 * depth);
-    };
+    /* ---- the wave in 3D: a double helix ------------------------------------
+       Two strands wind around the wave's axis half a turn apart, and the helix turns as the
+       wave travels. Each strand is a round tube lit from the upper left — a highlight running
+       along it, falling into shadow on the far side — written in the character ramp. Nearer
+       parts are bigger and brighter (perspective), farther parts thinner and fogged. Every cell
+       keeps only the nearest surface, and a thin gap is cut around whatever is in front, so the
+       far strand clearly passes behind. Thirteen rungs, one per koto string, join the strands
+       like a ladder; as the helix turns they lengthen, shorten and slip behind the strands.
+       Pluck a string and its rung shivers red. */
+    const RUNG = ["｜"], RUNG_UPRIGHT = ["ー"]; // a rung runs across the helix
+    const unit = (x, y, z) => { const l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; };
+    const LIGHT = unit(-0.3, -0.5, 0.81), HALF = unit(LIGHT[0], LIGHT[1], LIGHT[2] + 1); // y runs down the screen
+    const plucked = new Float32Array(32).fill(-99), pluckVel = new Float32Array(32);
+    let zbuf, lum, kind, redc, nearz, drawAt, sY, sZ, sR, cFade, cLit, rungShift; // grid buffers, and per-step buffers along the helix
     const hash = (a, b) => { const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return s - Math.floor(s); };
 
     // the shape of the wave at one horizontal position (u = 0…1 across the screen)
     function column(u) {
       const t = S.t, quiet = 1 - S.scroll;
-      const env = Math.pow(Math.sin(Math.PI * clamp(0, 1, u)), 1.4);
-      const touch = S.energy * Math.exp(-Math.pow((u - S.mu) / 0.08, 2));
+      const env = 0.6 + 0.4 * Math.pow(Math.sin(Math.PI * clamp(0, 1, u)), 0.8); // reaches both edges, narrowing towards them
+      const touch = S.energy * Math.exp(-Math.pow((u - S.mu) / 0.12, 2));
       let rip = 0;
       for (const r of ripples) {
         const age = t - r.t0;
         const d = Math.abs(u - r.u) - age * 0.5;
-        rip += r.s * Math.exp(-Math.pow(d / 0.04, 2)) * Math.exp(-age * 1.3);
+        rip += r.s * Math.exp(-Math.pow(d / 0.06, 2)) * Math.exp(-age * 1.3);
       }
-      const A = S.amp * quiet * Arows() * env * (0.7 + 0.2 * Math.sin(t * 0.7 + u * 4) + 0.4 * touch + 0.55 * Math.min(rip, 1.2));
-      const bend = S.pull * quiet * Math.exp(-Math.pow((u - S.mu) / 0.1, 2)) * env;
-      const th = u * Math.PI * 4.5 - t * 1.05;
+      const A = S.amp * quiet * Arows() * env * (0.72 + 0.12 * Math.sin(t * 0.5 + u * 4) + 0.35 * touch + 0.3 * Math.min(rip, 1.2));
+      const bend = S.pull * quiet * Math.exp(-Math.pow((u - S.mu) / 0.14, 2)) * env;
+      const th = u * TURNS - t * 0.75 - S.phase; // turns slowly on its own, and with your hand
       return { env, touch, rip, A, bend, th };
     }
 
@@ -532,29 +548,125 @@
       ba.reset();
       if (S.scroll >= 0.999) return;
       const cs = Math.ceil(cell * dpr);
+      const UP = upright(), AN = alongN(), XN = acrossN();
       const inkSet = glyphs(cs, ink), redSet = glyphs(cs, accent);
+      const inkRung = glyphs(cs, ink, UP ? RUNG_UPRIGHT : RUNG)[0], redRung = glyphs(cs, accent, UP ? RUNG_UPRIGHT : RUNG)[0];
       const ox = ((W - cols * cell) / 2) * dpr, oy = ((H - rows * cell) / 2) * dpr;
-      const mid = (rows - 1) / 2;
+      const mid = (XN - 1) / 2;
       const scatter = S.scroll * S.scroll * 26;
-      for (let c = 0; c < cols; c++) {
-        const { env, touch, rip, A, bend, th } = column((c + 0.5) / cols);
-        const y1 = A * Math.sin(th), z1 = Math.cos(th);
-        const fade = Math.min(1, env * 2.5);
-        const reach = Math.abs(y1) + Math.abs(bend) + 5;
-        const r0 = Math.max(0, Math.floor(mid - reach)), r1 = Math.min(rows - 1, Math.ceil(mid + reach));
-        const lit = touch > 0.3 || rip > 0.12;
-        for (let r = r0; r <= r1; r++) {
-          const v = r - mid - bend;
-          let I = Math.max(strand(v, y1, z1), strand(v, -y1, -z1)) * fade;
-          const ay = Math.abs(y1);
-          if (Math.abs(v) < ay) I = Math.max(I, 0.1 * fade * (1 - Math.abs(v) / (ay + 1e-3)));
-          if (Math.abs(v) < 0.5) I = Math.max(I, 0.2); // the baseline — silence
-          if (I < 0.07) continue;
-          const idx = Math.min(RAMP.length - 1, Math.floor(I * RAMP.length));
-          ctx.globalAlpha = (0.22 + 0.78 * Math.min(1, I)) * (1 - S.scroll * 0.6);
+      // a cell by its step along the helix (a) and its offset across it (x)
+      const at = UP ? (a, x) => a * cols + x : (a, x) => x * cols + a;
+      // the screen's across direction, and its along direction, as unit vectors (y runs down)
+      const [axX, axY, xxX, xxY] = UP ? [0, 1, 1, 0] : [1, 0, 0, 1];
+
+      const N = cols * rows;
+      if (!zbuf || zbuf.length !== N || sY.length !== AN * 2) {
+        zbuf = new Float32Array(N); lum = new Float32Array(N); kind = new Uint8Array(N); redc = new Uint8Array(N); nearz = new Float32Array(N); drawAt = new Float32Array(N);
+        sY = new Float32Array(AN * 2); sZ = new Float32Array(AN * 2); sR = new Float32Array(AN * 2);
+        cFade = new Float32Array(AN); cLit = new Uint8Array(AN); rungShift = new Float32Array(AN);
+      }
+      zbuf.fill(-1e9); nearz.fill(-1e9); kind.fill(0); redc.fill(0); rungShift.fill(0);
+
+      const Rmax = Math.max(1, Arows());
+      const F = Rmax * 4; // camera distance, in cells: nearer points up to ⅓ larger, farther ones ⅕ smaller
+      const tube = Math.max(1.3, Rmax * 0.12); // strand radius, in cells
+      // how far in front something must be to cut a gap around itself (more than a strand's own depth changes from cell to cell)
+      const gap = tube * 1.4 + Rmax * (TURNS / AN) * 1.6 + 1.5;
+
+      // both strands, step by step along the helix: offset across, depth, radius
+      for (let a = 0; a < AN; a++) {
+        const { env, touch, rip, A, bend, th } = column((a + 0.5) / AN);
+        const ua = (a + 0.5) / AN, ends = UP ? clamp(0, 1, (ua - 0.06) / 0.08) * clamp(0, 1, (0.94 - ua) / 0.08) : 1; // upright, it fades out before the bar and the switch
+        cFade[a] = Math.min(1, env * 2.5) * ends;
+        cLit[a] = touch > 0.64 || rip > 0.12 ? 1 : 0; // red while you move through it or pluck it, not while you rest on it
+        for (let j = 0; j < 2; j++) {
+          const ang = th + j * Math.PI, y = A * Math.sin(ang), z = A * Math.cos(ang), sc = F / (F - z);
+          sY[j * AN + a] = mid + bend + y * sc;
+          sZ[j * AN + a] = z;
+          sR[j * AN + a] = tube * sc;
+        }
+      }
+
+      // the strands: shaded tubes, measured across their path so steep stretches stay whole
+      for (let j = 0; j < 2; j++) {
+        const o = j * AN;
+        for (let a = 0; a < AN; a++) {
+          const yc = sY[o + a], z = sZ[o + a], rt = sR[o + a], fade = cFade[a];
+          if (fade < 0.02) continue;
+          const slope = (sY[o + Math.min(AN - 1, a + 1)] - sY[o + Math.max(0, a - 1)]) / (a > 0 && a < AN - 1 ? 2 : 1);
+          const k = Math.sqrt(1 + slope * slope), h = rt * k;
+          const px = (xxX - slope * axX) / k, py = (xxY - slope * axY) / k; // across the strand, in the screen plane
+          const fog = 0.4 + 0.6 * (0.5 + 0.5 * z / Rmax); // farther is paler
+          // cells are counted from the strand's own centre and drawn at their true offset, so the strand
+          // glides instead of snapping from cell to cell, and its shading doesn't flicker as it moves
+          const yr = Math.round(yc), K = Math.ceil(h);
+          for (let kk = -K; kk <= K; kk++) {
+            const x = yr + kk, edge = clamp(0, 1, h - Math.abs(kk) + 0.5); // outermost cells fade in as it thickens
+            if (x < 0 || x >= XN || edge <= 0) continue;
+            const n = clamp(-1, 1, kk / h), w = Math.sqrt(Math.max(0, 1 - n * n));
+            const nx = px * n, ny = py * n, nz = w; // the tube's surface normal here
+            const diff = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+            const spec = Math.pow(Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]), 8);
+            const L = Math.min(1, (0.06 + 0.8 * Math.pow(diff, 1.25) + 0.75 * spec) * fog) * fade * edge; // a deeper shadow side, so it reads round
+            const zs = z + rt * w, i = at(a, x);
+            if (zs > zbuf[i]) { zbuf[i] = zs; lum[i] = L; kind[i] = 1; drawAt[i] = yc + kk; redc[i] = cLit[a] && L > 0.38 ? 1 : 0; }
+            for (let da = -1; da <= 1; da++) {
+              const aa = a + da;
+              if (aa < 0 || aa >= AN) continue;
+              for (let dx = -1; dx <= 1; dx++) {
+                const xx = x + dx;
+                if (xx < 0 || xx >= XN) continue;
+                const ii = at(aa, xx);
+                if (zs > nearz[ii]) nearz[ii] = zs;
+              }
+            }
+          }
+        }
+      }
+
+      // the rungs — one per string — from strand to strand, through the axis
+      const NS = sound.strings;
+      for (let s = 0; s < NS; s++) {
+        const a = Math.min(AN - 1, Math.floor(((s + 0.5) / NS) * AN));
+        const fade = cFade[a];
+        if (fade < 0.02) continue;
+        const ya = sY[a], yb = sY[AN + a], za = sZ[a], zb = sZ[AN + a];
+        const age = S.t - plucked[s], ring = age >= 0 ? Math.exp(-age * 2.6) * pluckVel[s] : 0;
+        rungShift[a] = ring > 0.02 ? Math.sin(age * 58) * ring * cell * 0.4 : 0; // a plucked string shivers
+        for (let x = Math.max(0, Math.ceil(Math.min(ya, yb))), x1 = Math.min(XN - 1, Math.floor(Math.max(ya, yb))); x <= x1; x++) {
+          const t = yb === ya ? 0.5 : (x - ya) / (yb - ya);
+          const z = za + (zb - za) * t, i = at(a, x);
+          const L = Math.min(1, 0.12 + 0.5 * (0.5 + 0.5 * z / Rmax) + ring * 0.6) * fade; // brighter in front of the axis than behind it
+          if (z > zbuf[i]) { zbuf[i] = z; lum[i] = L; kind[i] = 2; drawAt[i] = x; redc[i] = ring > 0.15 ? 1 : 0; }
+        }
+      }
+
+      // write it out; anything just behind a nearer strand gives way, so the crossing reads
+      const dim = 1 - S.scroll * 0.6;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const i = r * cols + c, kd = kind[i];
+          if (!kd || nearz[i] > zbuf[i] + gap) continue;
+          const L = lum[i];
+          if (L < 0.06) continue;
+          const a = UP ? r : c, shift = kd === 2 ? rungShift[a] * dpr : 0;
           const dy = scatter ? (hash(c, r) - 0.5) * scatter : 0;
-          ctx.drawImage((lit && I > 0.4 ? redSet : inkSet)[idx], ox + c * cs, oy + (r + dy) * cs);
-          ba.record((ox + c * cs) / dpr, (oy + (r + dy) * cs) / dpr, idx, ctx.globalAlpha, lit && I > 0.4);
+          const x = UP ? ox + drawAt[i] * cs : ox + c * cs + shift;
+          const y = UP ? oy + (r + dy) * cs + shift : oy + (drawAt[i] + dy) * cs;
+          const red = redc[i] === 1;
+          // the characters themselves are in perspective: larger in front, smaller behind
+          const sz = cs * (0.72 + 0.4 * clamp(0, 1, 0.5 + 0.5 * zbuf[i] / Rmax)), inset = (cs - sz) / 2;
+          let idx;
+          if (kd === 1) {
+            idx = Math.min(RAMP.length - 1, Math.floor(L * RAMP.length));
+            ctx.globalAlpha = (0.18 + 0.82 * L) * dim;
+            ctx.drawImage((red ? redSet : inkSet)[idx], x + inset, y + inset, sz, sz);
+          } else {
+            idx = 2;
+            ctx.globalAlpha = (0.15 + 0.85 * L) * dim;
+            ctx.drawImage(red ? redRung : inkRung, x + inset, y + inset, sz, sz);
+          }
+          ba.record(x / dpr, y / dpr, idx, ctx.globalAlpha, red);
         }
       }
       ctx.globalAlpha = 1;
@@ -564,26 +676,28 @@
     const now = () => performance.now();
     let down = false, downX = 0, downY = 0, lastStrike = 0, lastString = -1, lx = 0, ly = 0, lt = 0;
     const active = (e) => S.scroll < 0.4 && !e.target.closest("a, button");
-    const stringAt = (x) => clamp(0, sound.strings - 1, Math.floor((x / W) * sound.strings));
+    const stringAt = (e) => clamp(0, sound.strings - 1, Math.floor(alongOf(e) * sound.strings));
     function strike(i, vel, delay = 0) {
       ripples.push({ u: (i + 0.5) / sound.strings, t0: S.t + delay, s: 0.25 + vel * 0.6 });
+      plucked[i] = S.t + delay; pluckVel[i] = vel;
       if (ripples.length > 18) ripples.shift();
       sound.pluck(i, vel, api, delay);
       lastStrike = now();
     }
     window.addEventListener("pointermove", (e) => {
       // how fast you move is how hard you pluck
-      const dt = Math.max(8, e.timeStamp - lt);
+      const dt = Math.max(8, e.timeStamp - lt), u = alongOf(e), du = lt ? u - (upright() ? ly / H : lx / W) : 0;
       const speed = (Math.hypot(e.clientX - lx, e.clientY - ly) / dt) * 1000;
       lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
-      const pyRows = (e.clientY - H / 2) / cell;
+      const pyRows = acrossOf(e);
       const near = clamp(0, 1, 1.6 - Math.abs(pyRows) / band());
-      S.muT = e.clientX / W;
-      S.energyT = near * clamp(0.3, 1, 0.3 + speed / 1400);
+      S.muT = u;
+      S.energyT = near * (0.75 + 0.25 * clamp(0, 1, speed / 1400)); // closeness sets the swell; speed only adds a little
+      if (near > 0.3 && S.scroll < 0.4) S.spin = clamp(-8, 8, S.spin + du * 10 * near); // sweep along it and it turns with you
       S.lastMove = now();
       S.pullT = Math.abs(pyRows) < band() ? clamp(-band(), band(), pyRows) * 0.55 : 0;
       // sweeping across the wave plucks every string you pass over
-      const i = stringAt(e.clientX);
+      const i = stringAt(e);
       const onWave = near > 0.4 && S.scroll < 0.4 && !e.target.closest("a, button");
       if (onWave && lastString !== -1 && i !== lastString && now() - lastStrike > 28) {
         const dir = Math.sign(i - lastString);
@@ -595,10 +709,10 @@
     window.addEventListener("pointerdown", (e) => {
       if (!active(e)) return;
       down = true; downX = e.clientX; downY = e.clientY;
-      if (e.pointerType !== "touch") { strike(stringAt(e.clientX), 0.95); lastString = stringAt(e.clientX); }
+      if (e.pointerType !== "touch") { strike(stringAt(e), 0.95); lastString = stringAt(e); }
     });
     window.addEventListener("pointerup", (e) => {
-      if (down && e.pointerType === "touch" && Math.hypot(e.clientX - downX, e.clientY - downY) < 10) strike(stringAt(e.clientX), 0.95);
+      if (down && e.pointerType === "touch" && Math.hypot(e.clientX - downX, e.clientY - downY) < 10) strike(stringAt(e), 0.95);
       down = false;
     });
     document.addEventListener("pointerleave", () => { S.pullT = 0; S.energyT = 0; });
@@ -632,11 +746,14 @@
     };
 
     gsap.ticker.add((time, dt) => {
-      if (!reduced) S.t += dt / 1000;
-      if (now() - S.lastMove > 1100) { S.energyT = 0; S.pullT = 0; }
-      S.mu += (S.muT - S.mu) * 0.08;
-      S.energy += (S.energyT - S.energy) * 0.06;
-      S.pull += (S.pullT - S.pull) * 0.07;
+      const k = Math.min(0.05, dt / 1000);
+      if (!reduced) { S.t += dt / 1000; S.phase += S.spin * k; }
+      S.spin *= Math.exp(-k * 1.8);
+      if (now() - S.lastMove > 1100) S.energyT = Math.min(S.energyT, 0.6); // resting nearby, it stays gently open
+      S.mu += (S.muT - S.mu) * (1 - Math.exp(-k * 7));
+      S.energy += (S.energyT - S.energy) * (1 - Math.exp(-k * 4));
+      S.pullV += ((S.pullT - S.pull) * 30 - S.pullV * 7.5) * k;
+      S.pull += S.pullV * k;
       while (ripples.length && S.t - ripples[0].t0 > 3.2) ripples.shift();
       const p = ba.ok ? ba.progress() : clamp(0, 1, window.scrollY / (H * 0.85));
       S.scroll = p;
